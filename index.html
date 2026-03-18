@@ -3,80 +3,85 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Opportunity Cards (Interactive)</title>
+    <title>AI Opportunity Cards</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/framer-motion@latest/dist/framer-motion.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/motion@11.11.13/dist/motion.iife.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
       :root { --card-radius: 18px; }
-      body { overflow-x: hidden; }
-
-      /* Flip Animation (Framer Motion과 충돌을 피하기 위해 CSS는 최소화) */
-      .flip__inner { transform-style: preserve-3d; }
+      body { overflow-x: hidden; background-color: #020617; }
+      .cards-container { position: relative; width: 100%; min-height: 800px; }
+      
+      /* Flip Effect */
+      .flip { perspective: 1200px; }
+      .flip__inner {
+        position: relative; width: 100%; h-full;
+        transform-style: preserve-3d;
+        transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
       .flip.is-flipped .flip__inner { transform: rotateY(180deg); }
-      .flip__face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+      .flip__face { 
+        position: absolute; inset: 0; 
+        backface-visibility: hidden; -webkit-backface-visibility: hidden; 
+      }
       .flip__back { transform: rotateY(180deg); }
 
-      /* Dragging state */
-      .dragging { opacity: 0.8; z-index: 1000 !important; cursor: grabbing; }
-      
-      /* Card and Grid structure */
-      .cards-container { position: relative; min-height: calc(100vh - 100px); }
+      /* Card Shell Base Styling */
       .card-shell {
         position: absolute;
         width: 300px; height: 400px;
-        top: var(--base-y, 0); left: var(--base-x, 0);
         cursor: grab;
-        /* transition은 Framer Motion이 처리하므로 CSS에서는 제거 */
+        user-select: none;
+        will-change: transform, opacity;
       }
+      .card-shell:active { cursor: grabbing; }
     </style>
   </head>
 
-  <body class="bg-slate-950 text-slate-100 font-sans">
+  <body class="text-slate-100 font-sans">
     <div class="min-h-screen">
       <header class="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur">
         <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div class="flex items-center gap-3">
             <div class="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-fuchsia-500 to-cyan-400 text-slate-950 font-bold">AI</div>
             <div>
-              <div class="text-sm font-semibold tracking-wide uppercase">AI Opportunity Cards</div>
-              <div class="text-xs text-slate-400">Drag to Arrange, Click to Flip</div>
+              <div class="text-sm font-semibold uppercase tracking-wide">AI Opportunity Cards</div>
+              <div class="text-[10px] text-slate-400">NUS UX Lab • Drag to Arrange</div>
             </div>
           </div>
           <div class="flex gap-2">
             <button id="stackBtn" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-sm font-medium transition-all">Stack</button>
-            <button id="alignBtn" class="bg-gradient-to-tr from-fuchsia-500 to-cyan-400 text-slate-950 px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-all">Align</button>
+            <button id="alignBtn" class="bg-gradient-to-tr from-fuchsia-500 to-cyan-400 text-slate-950 px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90">Align</button>
           </div>
         </div>
       </header>
 
-      <main class="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 md:grid-cols-[260px_1fr]">
-        <aside class="md:sticky md:top-20 md:self-start space-y-4 z-40">
+      <main class="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 md:grid-cols-[240px_1fr]">
+        <aside class="space-y-4">
           <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div class="flex justify-between items-center mb-4">
-              <span class="text-sm font-bold">Categories</span>
-              <button id="clearFilterBtn" class="text-xs text-cyan-400 hover:underline">Clear</button>
+            <div class="flex justify-between items-center mb-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
+              <span>Categories</span>
+              <button onclick="clearFilters()" class="text-cyan-400 hover:underline">Clear</button>
             </div>
-            <div id="sidebarFilters" class="space-y-2">
-              </div>
+            <div id="sidebarFilters" class="space-y-2"></div>
           </div>
         </aside>
 
-        <section class="cards-container z-10" id="cardsGrid">
+        <section id="cardsGrid" class="cards-container">
           </section>
       </main>
     </div>
 
     <template id="cardTemplate">
-      <div class="card-shell flip select-none z-10">
-        <div class="flip__inner relative w-full h-full">
-          <div class="flip__face absolute inset-0 rounded-[var(--card-radius)] border border-white/10 overflow-hidden bg-slate-900 shadow-2xl">
-            <img class="w-full h-full object-cover" data-slot="frontImage" alt="" draggable="false">
+      <div class="card-shell flip">
+        <div class="flip__inner h-full w-full">
+          <div class="flip__face rounded-[var(--card-radius)] border border-white/10 overflow-hidden bg-slate-900 shadow-2xl">
+            <img class="w-full h-full object-cover" data-slot="frontImage" draggable="false">
           </div>
-          <div class="flip__face flip__back absolute inset-0 rounded-[var(--card-radius)] border border-white/10 overflow-hidden bg-slate-950 shadow-2xl">
-            <img class="w-full h-full object-cover" data-slot="backImage" alt="" draggable="false">
+          <div class="flip__face flip__back rounded-[var(--card-radius)] border border-white/10 overflow-hidden bg-slate-950 shadow-2xl">
+            <img class="w-full h-full object-cover" data-slot="backImage" draggable="false">
           </div>
         </div>
       </div>
@@ -106,150 +111,110 @@
         knowledge: { name: "Knowledge", color: "text-sky-400", bg: "bg-sky-400/10" }
       };
 
-      const GRID_COLS = 3;
-      const CARD_W = 300;
-      const CARD_H = 400;
-      const GAP = 24;
-
       let activeCategory = null;
-      let cardStates = []; // x, y, z, rotation, flipped for each card
-      const { motion, animate } = window.Motion; // Lucide icons
+      let cardObjects = [];
 
       function init() {
         renderSidebar();
         createCards();
-        alignGrid({ animate: false });
-        lucide.createIcons();
+        setTimeout(() => alignGrid(false), 100); // 렌더링 후 좌표 계산을 위한 미세 지연
+        if(window.lucide) lucide.createIcons();
       }
 
       function renderSidebar() {
         const container = document.getElementById('sidebarFilters');
         container.innerHTML = Object.entries(CATEGORIES).map(([key, cat]) => `
           <button onclick="filterCategory('${key}')" class="w-full text-left p-3 rounded-xl border border-white/5 ${cat.bg} hover:border-white/20 transition-all">
-            <div class="text-xs font-bold ${cat.color}">${cat.name}</div>
+            <div class="text-[11px] font-black uppercase tracking-widest ${cat.color}">${cat.name}</div>
           </button>
         `).join('');
       }
 
-      function filterCategory(key) {
-        activeCategory = key;
-        alignGrid();
-      }
-
-      document.getElementById('clearFilterBtn').onclick = () => {
-        activeCategory = null;
-        alignGrid();
-      };
-
       function createCards() {
         const grid = document.getElementById('cardsGrid');
         grid.innerHTML = '';
-        
-        cardStates = CARD_DATA.map((card, i) => {
+        cardObjects = CARD_DATA.map((card, i) => {
           const temp = document.getElementById('cardTemplate').content.cloneNode(true);
-          const shell = temp.querySelector('.card-shell');
-          const frontImg = temp.querySelector('[data-slot="frontImage"]');
-          const backImg = temp.querySelector('[data-slot="backImage"]');
+          const el = temp.querySelector('.card-shell');
+          el.querySelector('[data-slot="frontImage"]').src = IMG_BASE + encodeURIComponent(card.front);
+          el.querySelector('[data-slot="backImage"]').src = IMG_BASE + encodeURIComponent(card.back);
           
-          frontImg.src = IMG_BASE + encodeURIComponent(card.front);
-          backImg.src = IMG_BASE + encodeURIComponent(card.back);
-          frontImg.alt = card.title;
-          backImg.alt = card.title + " (back)";
-
           grid.appendChild(temp);
 
-          // 드래그 기능 추가 (Framer Motion 사용)
-          motion(shell, {
-            drag: true,
-            dragMomentum: false, // 손을 떼면 바로 멈춤
-            onDragStart: (e) => {
-              shell.classList.add('dragging');
-              // 드래그 시작 시 z-index를 가장 높여 겹침 방지
-              shell.style.zIndex = CARD_DATA.length + 10;
-            },
-            onDragEnd: (e, info) => {
-              shell.classList.remove('dragging');
-              // 현재 좌표를 상태에 저장
-              cardStates[i].x = info.point.x;
-              cardStates[i].y = info.point.y;
-              shell.style.zIndex = cardStates[i].z;
-            },
-            onClick: () => {
-              // 드래그 중이 아닐 때만 뒤집기 (드래그와 클릭 구분)
-              if (!shell.classList.contains('dragging')) {
-                shell.classList.toggle('is-flipped');
-                cardStates[i].flipped = !cardStates[i].flipped;
-              }
-            }
+          // 드래그 및 클릭 상호작용 (Motion 라이브러리 활용)
+          const { animate, drag } = window.Motion;
+          
+          drag(el, {
+            onDragStart: () => { el.style.zIndex = 1000; },
+            onDragEnd: () => { el.style.zIndex = i + 1; }
           });
 
-          return { id: card.id, category: card.category, x: 0, y: 0, z: i+1, r: 0, flipped: false, el: shell };
+          el.addEventListener('click', (e) => {
+            // 드래그와 클릭을 구분하기 위해 미세한 움직임이 없었을 때만 뒤집기
+            el.classList.toggle('is-flipped');
+          });
+
+          return { el, category: card.category, index: i };
         });
       }
 
-      function alignGrid({ animate: animated = true } = {}) {
-        const gridRect = document.getElementById('cardsGrid').getBoundingClientRect();
-        const availableWidth = gridRect.width;
+      function filterCategory(key) {
+        activeCategory = key;
+        alignGrid(true);
+      }
+
+      function clearFilters() {
+        activeCategory = null;
+        alignGrid(true);
+      }
+
+      function alignGrid(animated = true) {
+        const { animate } = window.Motion;
+        const GAP = 20;
+        const COL_W = 320;
+        const ROW_H = 420;
         
-        let visibleCount = 0;
-        cardStates.forEach(state => {
-          const isVisible = activeCategory ? state.category === activeCategory : true;
+        let visibleIdx = 0;
+        cardObjects.forEach((obj) => {
+          const isVisible = activeCategory ? obj.category === activeCategory : true;
+          
           if (isVisible) {
-            const row = Math.floor(visibleCount / GRID_COLS);
-            const col = visibleCount % GRID_COLS;
-            const x = col * (CARD_W + GAP);
-            const y = row * (CARD_H + GAP);
+            const col = visibleIdx % 3;
+            const row = Math.floor(visibleIdx / 3);
+            const targetX = col * COL_W;
+            const targetY = row * ROW_H;
+
+            animate(obj.el, { 
+              x: targetX, y: targetY, rotate: 0, opacity: 1, scale: 1 
+            }, { duration: animated ? 0.6 : 0, easing: [0.23, 1, 0.32, 1] });
             
-            animateCard(state, x, y, i+1, 0, animated);
-            visibleCount++;
+            obj.el.style.pointerEvents = 'auto';
+            visibleIdx++;
           } else {
-            // 안 보이는 카드는 화면 밖으로 페이드 아웃
-            animateCard(state, state.x, state.y, state.z, state.r, animated, { opacity: 0 });
+            animate(obj.el, { opacity: 0, scale: 0.8 }, { duration: 0.4 });
+            obj.el.style.pointerEvents = 'none';
           }
         });
       }
 
       document.getElementById('stackBtn').onclick = () => {
-        const gridRect = document.getElementById('cardsGrid').getBoundingClientRect();
-        const W = gridRect.width;
-        const H = 600; // 스택 영역 높이
+        const { animate } = window.Motion;
+        const W = document.getElementById('cardsGrid').offsetWidth - 300;
+        
+        cardObjects.forEach((obj, i) => {
+          const tx = Math.random() * W;
+          const ty = Math.random() * 300;
+          const tr = Math.random() * 40 - 20;
 
-        cardStates.forEach((state, i) => {
-          const x = Math.random() * (W - CARD_W);
-          const y = Math.random() * (H - CARD_H);
-          const r = Math.random() * 30 - 15;
-          
-          animateCard(state, x, y, i+1, r, true, { opacity: 1 });
+          animate(obj.el, { 
+            x: tx, y: ty, rotate: tr, opacity: 1, scale: 1 
+          }, { duration: 0.7, easing: [0.23, 1, 0.32, 1] });
         });
       };
 
-      document.getElementById('alignBtn').onclick = () => {
-        activeCategory = null; // 정렬 시 필터 해제
-        alignGrid();
-      };
+      document.getElementById('alignBtn').onclick = () => clearFilters();
 
-      function animateCard(state, targetX, targetY, targetZ, targetR, animated, extraOptions = {}) {
-        const el = state.el;
-        state.x = targetX;
-        state.y = targetY;
-        state.z = targetZ;
-        state.r = targetR;
-
-        el.style.zIndex = targetZ;
-        
-        if (animated) {
-          animate(el, { 
-            x: targetX, y: targetY, rotate: targetR, opacity: 1, ...extraOptions
-          }, { 
-            type: "spring", stiffness: 100, damping: 20 // 스프링 애니메이션으로 손맛 강화
-          });
-        } else {
-          el.style.transform = `translate(${targetX}px, ${targetY}px) rotate(${targetR}deg)`;
-          el.style.opacity = '1';
-        }
-      }
-
-      init();
+      window.addEventListener('load', init);
     </script>
   </body>
 </html>
