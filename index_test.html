@@ -1,1 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Opportunity Cards</title>
 
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/motion@11.11.13/dist/motion.iife.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+      :root { --card-radius: 18px; }
+      body { overflow-x: hidden; }
+
+      /* Flip Animation */
+      .flip { perspective: 1200px; }
+      .flip__inner {
+        transform-style: preserve-3d;
+        transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .flip.is-flipped .flip__inner { transform: rotateY(180deg); }
+      .flip__face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+      .flip__back { transform: rotateY(180deg); }
+
+      /* Stack mode: 자유로운 레이아웃을 위해 absolute 사용 */
+      .stack-mode .group-wrap { position: relative; min-height: 500px; }
+      .stack-mode .card-shell {
+        position: absolute !important;
+        top: 50%; left: 50%;
+        margin-left: -150px; margin-top: -130px; /* 카드 중심점 보정 */
+        z-index: var(--stack-z, 1);
+        transform: translate(var(--stack-x, 0px), var(--stack-y, 0px)) rotate(var(--stack-r, 0deg)) scale(var(--stack-s, 1));
+      }
+      .card-shell { transition: all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    </style>
+  </head>
+
+  <body class="bg-slate-950 text-slate-100 font-sans">
+    <div class="min-h-screen">
+      <header class="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur">
+        <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+          <div class="flex items-center gap-3">
+            <div class="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-fuchsia-500 to-cyan-400 text-slate-950 font-bold">AI</div>
+            <div>
+              <div class="text-sm font-semibold tracking-wide uppercase">AI Opportunity Cards</div>
+              <div class="text-xs text-slate-400">Interactive Ideation Dashboard</div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button id="stackBtn" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-sm font-medium transition-all">Stack</button>
+            <button id="alignBtn" class="bg-gradient-to-tr from-fuchsia-500 to-cyan-400 text-slate-950 px-4 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-all">Align</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 md:grid-cols-[260px_1fr]">
+        <aside class="md:sticky md:top-20 md:self-start space-y-4">
+          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div class="flex justify-between items-center mb-4">
+              <span class="text-sm font-bold">Categories</span>
+              <button id="clearFilterBtn" class="text-xs text-cyan-400 hover:underline">Clear</button>
+            </div>
+            <div id="sidebarFilters" class="space-y-2">
+              </div>
+          </div>
+        </aside>
+
+        <section>
+          <div id="cardsGrid" class="space-y-12 transition-all duration-500">
+            </div>
+
+          <div id="about" class="mt-12 rounded-2xl border border-white/10 bg-white/5 p-6">
+            <h2 class="text-lg font-bold text-white mb-2">About the Toolkit</h2>
+            <p class="text-sm text-slate-300 leading-relaxed mb-6">
+              This toolkit was developed to help AI designers, educators, students & practitioners who ideate and early sketch AI-powered services.
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs border-t border-white/10 pt-6">
+              <div>
+                <span class="block text-slate-500 uppercase mb-1">Developed by</span>
+                <a href="https://blog.nus.edu.sg/uxlab/" target="_blank" class="text-cyan-400 hover:underline font-bold text-sm">NUS UX Lab</a>
+                <div class="mt-1 text-slate-300">Principal Investigator: <a href="https://www.linkedin.com/in/katesangwonlee" target="_blank" class="hover:text-white underline">Dr. Kate Sangwon Lee</a></div>
+              </div>
+              <div>
+                <span class="block text-slate-500 uppercase mb-1">Collaborators</span>
+                <div class="text-sm text-slate-300">Dr. Jung Joo Lee, Mijin Choi, Eda Yasmin Asni</div>
+              </div>
+            </div>
+            <div class="mt-6">
+              <a href="https://dl.acm.org/doi/10.1145/3748699.3749817" target="_blank" class="inline-flex items-center gap-2 text-xs bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg transition-all">
+                <i data-lucide="external-link" class="w-3 h-3"></i> View Publication & More Info
+              </a>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="cardTemplate">
+      <article class="card-shell flip group cursor-pointer select-none">
+        <div class="flip__inner relative w-[300px] h-[400px]">
+          <div class="flip__face absolute inset-0 rounded-[var(--card-radius)] border border-white/10 overflow-hidden bg-slate-900 shadow-2xl">
+            <img class="w-full h-full object-cover" data-slot="frontImage" alt="">
+          </div>
+          <div class="flip__face flip__back absolute inset-0 rounded-[var(--card-radius)] border border-white/10 overflow-hidden bg-slate-950 shadow-2xl">
+            <img class="w-full h-full object-cover" data-slot="backImage" alt="">
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script>
+      const IMG_BASE = "./images/";
+      const CARD_DATA = [
+        { id: "1", category: "personalization", title: "AI Personalization", front: "1_AI Personalization_Front.png", back: "1_AI Personalization_Back.png" },
+        { id: "2", category: "personalization", title: "Onboarding", front: "2_Onboarding for Personalization_Front.png", back: "2_Onboarding for Personalization_Back.png" },
+        { id: "3", category: "personalization", title: "App Features", front: "3_AI-powered App-specific Feature_Front.png", back: "3_AI-powered App-specific Feature_Back.png" },
+        { id: "4", category: "guidance", title: "AI Nudge", front: "4_AI Nudge_Notification_Front.png", back: "4_AI Nudge_Notification_Back.png" },
+        { id: "5", category: "guidance", title: "AI Recommendation", front: "5_AI Recommendation _ AI Action Items_Front.png", back: "5_AI Recommendation _ AI Action Items_Back.png" },
+        { id: "6", category: "guidance", title: "AI Projection", front: "6_AI Projection_Front.png", back: "6_AI Projection_Back.png" },
+        { id: "7", category: "content", title: "Auto-fill", front: "7_AI Context Aware Auto-fill_Front.png", back: "7_AI Context Aware Auto-fill_Back.png" },
+        { id: "8", category: "content", title: "Sketch-to-Concept", front: "8_AI Sketch-to-Concept_Front.png", back: "8_AI Sketch-to-Concept_Back.png" },
+        { id: "9", category: "content", title: "NLU", front: "9_AI-powered Natural Language Understanding_Front.png", back: "9_AI-powered Natural Language Understanding_Back.png" },
+        { id: "10", category: "knowledge", title: "AI Summary", front: "10_AI Summary_Front.png", back: "10_AI Summary_Back.png" },
+        { id: "11", category: "knowledge", title: "Knowledge Sharing", front: "11_AI Knowledge Sharing Platform_Front.png", back: "11_AI Knowledge Sharing Platform_Back.png" },
+        { id: "12", category: "knowledge", title: "Data Organization", front: "12_AI-powered Data Organization_Front.png", back: "12_AI-powered Data Organization_Back.png" }
+      ];
+
+      const CATEGORIES = {
+        personalization: { name: "Personalization & User Modeling", color: "text-emerald-400", bg: "bg-emerald-400/10" },
+        guidance: { name: "Guidance & Decision Support", color: "text-rose-400", bg: "bg-rose-400/10" },
+        content: { name: "Content Creation & Input Assistance", color: "text-violet-400", bg: "bg-violet-400/10" },
+        knowledge: { name: "Knowledge Management & Information Structuring", color: "text-sky-400", bg: "bg-sky-400/10" }
+      };
+
+      let activeCategory = null;
+      let isStacked = false;
+
+      function init() {
+        renderSidebar();
+        renderGrid();
+        lucide.createIcons();
+      }
+
+      function renderSidebar() {
+        const container = document.getElementById('sidebarFilters');
+        container.innerHTML = Object.entries(CATEGORIES).map(([key, cat]) => `
+          <button onclick="filterCategory('${key}')" class="w-full text-left p-3 rounded-xl border border-white/5 ${cat.bg} hover:border-white/20 transition-all">
+            <div class="text-xs font-bold ${cat.color}">${cat.name}</div>
+          </button>
+        `).join('');
+      }
+
+      function filterCategory(key) {
+        activeCategory = key;
+        isStacked = false;
+        document.body.classList.remove('stack-mode');
+        renderGrid();
+      }
+
+      document.getElementById('clearFilterBtn').onclick = () => {
+        activeCategory = null;
+        isStacked = false;
+        document.body.classList.remove('stack-mode');
+        renderGrid();
+      };
+
+      function renderGrid() {
+        const grid = document.getElementById('cardsGrid');
+        grid.innerHTML = '';
+        
+        const keys = activeCategory ? [activeCategory] : Object.keys(CATEGORIES);
+        
+        keys.forEach(key => {
+          const section = document.createElement('div');
+          section.className = "group-wrap";
+          section.innerHTML = `<h3 class="text-sm font-bold opacity-50 mb-4 uppercase tracking-widest">${CATEGORIES[key].name}</h3>`;
+          
+          const cardsInner = document.createElement('div');
+          cardsInner.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";
+          
+          CARD_DATA.filter(c => c.category === key).forEach(card => {
+            const temp = document.getElementById('cardTemplate').content.cloneNode(true);
+            const shell = temp.querySelector('.card-shell');
+            temp.querySelector('[data-slot="frontImage"]').src = IMG_BASE + encodeURIComponent(card.front);
+            temp.querySelector('[data-slot="backImage"]').src = IMG_BASE + encodeURIComponent(card.back);
+            
+            shell.onclick = () => shell.classList.toggle('is-flipped');
+            cardsInner.appendChild(temp);
+          });
+          
+          section.appendChild(cardsInner);
+          grid.appendChild(section);
+        });
+      }
+
+      document.getElementById('stackBtn').onclick = () => {
+        isStacked = true;
+        document.body.classList.add('stack-mode');
+        const cards = document.querySelectorAll('.card-shell');
+        cards.forEach((card, i) => {
+          const x = Math.random() * 600 - 300;
+          const y = Math.random() * 400 - 200;
+          const r = Math.random() * 30 - 15;
+          card.style.setProperty('--stack-x', `${x}px`);
+          card.style.setProperty('--stack-y', `${y}px`);
+          card.style.setProperty('--stack-r', `${r}deg`);
+          card.style.setProperty('--stack-z', i + 1);
+        });
+      };
+
+      document.getElementById('alignBtn').onclick = () => {
+        isStacked = false;
+        document.body.classList.remove('stack-mode');
+        document.querySelectorAll('.card-shell').forEach(card => {
+          card.style.removeProperty('--stack-x');
+          card.style.removeProperty('--stack-y');
+          card.style.removeProperty('--stack-r');
+          card.style.removeProperty('--stack-z');
+        });
+      };
+
+      init();
+    </script>
+  </body>
+</html>
