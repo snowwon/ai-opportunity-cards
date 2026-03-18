@@ -36,12 +36,23 @@
         transform: rotateY(180deg);
       }
 
-      /* Stack mode (messy deck offsets) */
+      /* Stack mode (realistic card deck with z-index layering) */
       .stack-mode .card-shell {
+        position: relative;
         transform:
           translate(var(--stack-x, 0px), var(--stack-y, 0px))
           rotate(var(--stack-r, 0deg))
           scale(var(--stack-s, 1));
+        z-index: var(--stack-z, 0);
+        transition: none;
+      }
+
+      .stack-mode {
+        perspective: 1500px;
+      }
+
+      .stack-mode #cardsGrid {
+        position: relative;
       }
     </style>
   </head>
@@ -575,22 +586,29 @@
           n.style.removeProperty("--stack-y");
           n.style.removeProperty("--stack-r");
           n.style.removeProperty("--stack-s");
+          n.style.removeProperty("--stack-z");
         }
       }
 
       function applyStackIfNeeded(forceNew = false) {
         if (!state.stacked) return;
         const nodes = Array.from(els.cardsGrid.querySelectorAll(".card-shell"));
-        for (const n of nodes) {
+        for (let i = 0; i < nodes.length; i++) {
+          const n = nodes[i];
           if (!forceNew && n.style.getPropertyValue("--stack-x")) continue;
-          const x = Math.round((Math.random() * 2 - 1) * 14);
-          const y = Math.round((Math.random() * 2 - 1) * 12);
-          const r = ((Math.random() * 2 - 1) * 4).toFixed(2);
-          const s = (1 - Math.random() * 0.02).toFixed(3);
+          
+          // Larger movement ranges for realistic card deck effect
+          const x = Math.round((Math.random() * 2 - 1) * 45);      // ±45px (was ±14px)
+          const y = Math.round((Math.random() * 2 - 1) * 35);      // ±35px (was ±12px)
+          const r = ((Math.random() * 2 - 1) * 12).toFixed(2);     // ±12 degrees (was ±4)
+          const s = (0.97 + Math.random() * 0.04).toFixed(3);      // 0.97 to 1.01 scale
+          const z = Math.floor(i);                                 // Z-index based on position
+          
           n.style.setProperty("--stack-x", `${x}px`);
           n.style.setProperty("--stack-y", `${y}px`);
           n.style.setProperty("--stack-r", `${r}deg`);
           n.style.setProperty("--stack-s", `${s}`);
+          n.style.setProperty("--stack-z", `${z}`);
         }
       }
 
