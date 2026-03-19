@@ -10,10 +10,13 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-      :root { --card-radius: 18px; }
+      :root {
+        --card-radius: 18px;
+        --shuffle-card-width: 220px;
+        --shuffle-card-height: 294px;
+      }
       body { overflow-x: hidden; }
 
-      /* Flip Animation */
       .flip { perspective: 1200px; }
       .flip__inner {
         transform-style: preserve-3d;
@@ -23,16 +26,82 @@
       .flip__face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
       .flip__back { transform: rotateY(180deg); }
 
-      /* Stack mode: 자유로운 레이아웃을 위해 absolute 사용 */
-      .stack-mode .group-wrap { position: relative; min-height: 500px; }
-      .stack-mode .card-shell {
-        position: absolute !important;
-        top: 50%; left: 50%;
-        margin-left: -150px; margin-top: -130px; /* 카드 중심점 보정 */
-        z-index: var(--stack-z, 1);
-        transform: translate(var(--stack-x, 0px), var(--stack-y, 0px)) rotate(var(--stack-r, 0deg)) scale(var(--stack-s, 1));
+      .card-shell img {
+        pointer-events: none;
+        -webkit-user-drag: none;
+        user-select: none;
       }
-      .card-shell { transition: all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+      .card-shell {
+        transition:
+          left 280ms cubic-bezier(0.22, 1, 0.36, 1),
+          top 280ms cubic-bezier(0.22, 1, 0.36, 1),
+          transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+          box-shadow 280ms ease;
+        touch-action: none;
+      }
+
+      .shuffle-board {
+        position: relative;
+        min-height: 860px;
+        overflow: hidden;
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background:
+          radial-gradient(circle at top, rgba(34, 211, 238, 0.14), transparent 28%),
+          radial-gradient(circle at bottom, rgba(244, 63, 94, 0.12), transparent 24%),
+          linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 1));
+      }
+
+      .shuffle-lane {
+        position: absolute;
+        top: 24px;
+        bottom: 24px;
+        width: min(25%, 280px);
+        border-radius: 24px;
+        border: 1px dashed rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.04);
+        pointer-events: none;
+        transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+      }
+
+      .shuffle-lane.accept { left: 24px; }
+      .shuffle-lane.reject { right: 24px; }
+      .shuffle-lane.is-active {
+        border-color: rgba(255, 255, 255, 0.4);
+        background: rgba(255, 255, 255, 0.08);
+        transform: scale(1.01);
+      }
+
+      .shuffle-card {
+        position: absolute;
+        width: var(--shuffle-card-width);
+        height: var(--shuffle-card-height);
+        cursor: grab;
+      }
+
+      .shuffle-card .flip__inner {
+        width: 100%;
+        height: 100%;
+      }
+
+      .shuffle-card.is-dragging {
+        cursor: grabbing;
+        transition: none;
+      }
+
+      .shuffle-card.is-dragging .flip__inner {
+        filter: drop-shadow(0 28px 40px rgba(15, 23, 42, 0.45));
+      }
+
+      @media (max-width: 1024px) {
+        :root {
+          --shuffle-card-width: 180px;
+          --shuffle-card-height: 240px;
+        }
+
+        .shuffle-board { min-height: 760px; }
+      }
     </style>
   </head>
 
@@ -133,8 +202,13 @@
         knowledge: { name: "Knowledge Management & Information Structuring", color: "text-sky-400", bg: "bg-sky-400/10" }
       };
 
+      const SHUFFLE_CARD_WIDTH = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--shuffle-card-width')) || 220;
+      const SHUFFLE_CARD_HEIGHT = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--shuffle-card-height')) || 294;
+
       let activeCategory = null;
       let isStacked = false;
+      let stackState = {};
+      let stackZ = CARD_DATA.length + 10;
 
       function init() {
         renderSidebar();
@@ -153,24 +227,271 @@
 
       function filterCategory(key) {
         activeCategory = key;
-        isStacked = false;
-        document.body.classList.remove('stack-mode');
+        if (isStacked) initStackState(true);
         renderGrid();
       }
 
       document.getElementById('clearFilterBtn').onclick = () => {
         activeCategory = null;
-        isStacked = false;
-        document.body.classList.remove('stack-mode');
+        if (isStacked) initStackState(true);
         renderGrid();
       };
+
+      function getVisibleCards() {
+        return activeCategory ? CARD_DATA.filter(card => card.category === activeCategory) : [...CARD_DATA];
+      }
+
+      function clamp(value, min, max) {
+        if (max < min) return min;
+        return Math.min(Math.max(value, min), max);
+      }
+
+      function getLaneBounds(boardRect, lane) {
+        const pad = 24;
+        const laneWidth = Math.min(280, Math.max(220, boardRect.width * 0.24));
+        const cardWidth = SHUFFLE_CARD_WIDTH();
+        const cardHeight = SHUFFLE_CARD_HEIGHT();
+        const maxY = Math.max(96, boardRect.height - cardHeight - pad);
+
+        if (lane === 'accept') {
+          return {
+            minX: pad + 8,
+            maxX: pad + laneWidth - cardWidth - 8,
+            minY: 92,
+            maxY
+          };
+        }
+
+        if (lane === 'reject') {
+          return {
+            minX: boardRect.width - laneWidth + 8 - pad,
+            maxX: boardRect.width - cardWidth - pad - 8,
+            minY: 92,
+            maxY
+          };
+        }
+
+        return {
+          minX: pad + laneWidth + 28,
+          maxX: boardRect.width - laneWidth - cardWidth - 52,
+          minY: 104,
+          maxY
+        };
+      }
+
+      function createScatterPosition(boardRect, zone, indexInZone = 0) {
+        const bounds = getLaneBounds(boardRect, zone);
+        const xSpan = Math.max(0, bounds.maxX - bounds.minX);
+        const ySpan = Math.max(0, bounds.maxY - bounds.minY);
+
+        if (zone === 'center') {
+          return {
+            zone,
+            x: bounds.minX + Math.random() * xSpan,
+            y: bounds.minY + Math.random() * ySpan,
+            r: Math.random() * 24 - 12
+          };
+        }
+
+        const pileBaseX = bounds.minX + xSpan / 2;
+        const pileBaseY = bounds.minY + 18 + indexInZone * 18;
+        return {
+          zone,
+          x: clamp(pileBaseX + (Math.random() * 36 - 18), bounds.minX, bounds.maxX),
+          y: clamp(pileBaseY + (Math.random() * 24 - 12), bounds.minY, bounds.maxY),
+          r: Math.random() * 16 - 8
+        };
+      }
+
+      function initStackState(forceReset = false) {
+        const visibleCards = getVisibleCards();
+        const grid = document.getElementById('cardsGrid');
+        const boardRect = {
+          width: grid.clientWidth || 960,
+          height: Math.max(window.innerHeight * 0.72, 860)
+        };
+
+        if (forceReset) stackState = {};
+
+        visibleCards.forEach(card => {
+          if (!stackState[card.id]) {
+            stackState[card.id] = {
+              ...createScatterPosition(boardRect, 'center'),
+              flipped: false
+            };
+          }
+        });
+
+        stackZ = visibleCards.length + 20;
+      }
+
+      function normalizeStackState(boardRect, visibleCards) {
+        visibleCards.forEach(card => {
+          if (!stackState[card.id]) return;
+
+          const zone = stackState[card.id].zone || 'center';
+          const bounds = getLaneBounds(boardRect, zone === 'accept' || zone === 'reject' ? zone : 'center');
+          stackState[card.id].x = clamp(stackState[card.id].x, bounds.minX, bounds.maxX);
+          stackState[card.id].y = clamp(stackState[card.id].y, bounds.minY, bounds.maxY);
+        });
+      }
+
+      function updateLaneHighlights(board, zone) {
+        board.querySelectorAll('.shuffle-lane').forEach(lane => {
+          lane.classList.toggle('is-active', zone && lane.dataset.lane === zone);
+        });
+      }
+
+      function detectLane(board, clientX) {
+        const rect = board.getBoundingClientRect();
+        const localX = clientX - rect.left;
+        const acceptBounds = getLaneBounds(rect, 'accept');
+        const rejectBounds = getLaneBounds(rect, 'reject');
+
+        if (localX >= acceptBounds.minX && localX <= acceptBounds.maxX + SHUFFLE_CARD_WIDTH()) return 'accept';
+        if (localX >= rejectBounds.minX - SHUFFLE_CARD_WIDTH() && localX <= rect.width - 12) return 'reject';
+        return 'center';
+      }
+
+      function renderShuffleBoard(grid) {
+        const visibleCards = getVisibleCards();
+        initStackState();
+        normalizeStackState({
+          width: grid.clientWidth || 960,
+          height: Math.max(window.innerHeight * 0.72, 860)
+        }, visibleCards);
+
+        const board = document.createElement('div');
+        board.className = 'shuffle-board';
+        board.innerHTML = `
+          <div class="absolute inset-x-0 top-0 z-0 flex items-start justify-center px-8 pt-6 text-center">
+            <div class="max-w-xl">
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-cyan-300/75">Shuffle Mode</div>
+              <p class="mt-2 text-sm text-slate-300">Drag cards through the middle and drop them into the left accept pile or right reject pile.</p>
+            </div>
+          </div>
+          <div class="shuffle-lane accept" data-lane="accept">
+            <div class="px-6 pt-6">
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-300">Accept</div>
+              <div class="mt-2 text-sm text-slate-300">Ideas worth keeping</div>
+            </div>
+          </div>
+          <div class="shuffle-lane reject" data-lane="reject">
+            <div class="px-6 pt-6 text-right">
+              <div class="text-xs font-semibold uppercase tracking-[0.35em] text-rose-300">Reject</div>
+              <div class="mt-2 text-sm text-slate-300">Ideas to set aside</div>
+            </div>
+          </div>
+        `;
+
+        visibleCards.forEach((card) => {
+          const temp = document.getElementById('cardTemplate').content.cloneNode(true);
+          const shell = temp.querySelector('.card-shell');
+          const state = stackState[card.id];
+
+          shell.classList.add('shuffle-card');
+          shell.dataset.cardId = card.id;
+          shell.style.left = `${state.x}px`;
+          shell.style.top = `${state.y}px`;
+          shell.style.transform = `rotate(${state.r}deg)`;
+          shell.style.zIndex = `${++stackZ}`;
+          shell.classList.toggle('is-flipped', !!state.flipped);
+
+          temp.querySelector('[data-slot="frontImage"]').src = IMG_BASE + encodeURIComponent(card.front);
+          temp.querySelector('[data-slot="backImage"]').src = IMG_BASE + encodeURIComponent(card.back);
+
+          let pointerMoved = false;
+          let originX = 0;
+          let originY = 0;
+          let startX = 0;
+          let startY = 0;
+
+          shell.onpointerdown = (event) => {
+            event.preventDefault();
+            pointerMoved = false;
+            originX = stackState[card.id].x;
+            originY = stackState[card.id].y;
+            startX = event.clientX;
+            startY = event.clientY;
+
+            shell.classList.add('is-dragging');
+            shell.style.zIndex = `${++stackZ}`;
+            shell.setPointerCapture(event.pointerId);
+          };
+
+          shell.onpointermove = (event) => {
+            if (!shell.hasPointerCapture(event.pointerId)) return;
+            event.preventDefault();
+
+            const dx = event.clientX - startX;
+            const dy = event.clientY - startY;
+            if (Math.abs(dx) > 4 || Math.abs(dy) > 4) pointerMoved = true;
+
+            const boardRect = board.getBoundingClientRect();
+            const cardWidth = SHUFFLE_CARD_WIDTH();
+            const cardHeight = SHUFFLE_CARD_HEIGHT();
+            const nextX = clamp(originX + dx, 12, boardRect.width - cardWidth - 12);
+            const nextY = clamp(originY + dy, 72, boardRect.height - cardHeight - 12);
+
+            stackState[card.id].x = nextX;
+            stackState[card.id].y = nextY;
+            stackState[card.id].zone = 'center';
+
+            shell.style.left = `${nextX}px`;
+            shell.style.top = `${nextY}px`;
+
+            updateLaneHighlights(board, detectLane(board, event.clientX));
+          };
+
+          shell.onpointerup = (event) => {
+            event.preventDefault();
+            if (shell.hasPointerCapture(event.pointerId)) {
+              shell.releasePointerCapture(event.pointerId);
+            }
+
+            shell.classList.remove('is-dragging');
+            updateLaneHighlights(board, null);
+
+            if (!pointerMoved) {
+              stackState[card.id].flipped = !stackState[card.id].flipped;
+              shell.classList.toggle('is-flipped', stackState[card.id].flipped);
+              return;
+            }
+
+            const lane = detectLane(board, event.clientX);
+            stackState[card.id].zone = lane;
+          };
+
+          shell.onpointercancel = (event) => {
+            if (shell.hasPointerCapture(event.pointerId)) {
+              shell.releasePointerCapture(event.pointerId);
+            }
+            shell.classList.remove('is-dragging');
+            updateLaneHighlights(board, null);
+          };
+
+          shell.ondragstart = () => false;
+          temp.querySelectorAll('img').forEach((img) => {
+            img.draggable = false;
+          });
+
+          board.appendChild(temp);
+        });
+
+        grid.appendChild(board);
+      }
 
       function renderGrid() {
         const grid = document.getElementById('cardsGrid');
         grid.innerHTML = '';
-        
+
+        if (isStacked) {
+          renderShuffleBoard(grid);
+          return;
+        }
+
         const keys = activeCategory ? [activeCategory] : Object.keys(CATEGORIES);
-        
+
         keys.forEach(key => {
           const section = document.createElement('div');
           section.className = "group-wrap";
@@ -196,29 +517,18 @@
 
       document.getElementById('stackBtn').onclick = () => {
         isStacked = true;
-        document.body.classList.add('stack-mode');
-        const cards = document.querySelectorAll('.card-shell');
-        cards.forEach((card, i) => {
-          const x = Math.random() * 600 - 300;
-          const y = Math.random() * 400 - 200;
-          const r = Math.random() * 30 - 15;
-          card.style.setProperty('--stack-x', `${x}px`);
-          card.style.setProperty('--stack-y', `${y}px`);
-          card.style.setProperty('--stack-r', `${r}deg`);
-          card.style.setProperty('--stack-z', i + 1);
-        });
+        initStackState(true);
+        renderGrid();
       };
 
       document.getElementById('alignBtn').onclick = () => {
         isStacked = false;
-        document.body.classList.remove('stack-mode');
-        document.querySelectorAll('.card-shell').forEach(card => {
-          card.style.removeProperty('--stack-x');
-          card.style.removeProperty('--stack-y');
-          card.style.removeProperty('--stack-r');
-          card.style.removeProperty('--stack-z');
-        });
+        renderGrid();
       };
+
+      window.addEventListener('resize', () => {
+        if (isStacked) renderGrid();
+      });
 
       init();
     </script>
